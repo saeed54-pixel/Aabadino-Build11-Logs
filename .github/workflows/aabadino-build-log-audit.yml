@@ -1,0 +1,115 @@
+name: Audit every archived Aabadino build log
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/aabadino-build-log-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Extract archived Unity build reports and index errors and warnings
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          python - <<'PY'
+          import io, json, re, urllib.request, zipfile
+          from pathlib import Path
+          from urllib.parse import quote
+
+          owner_repo = "saeed54-pixel/Aabadino-Build11-Logs"
+          api = f"https://api.github.com/repos/{owner_repo}/git/trees/main?recursive=1"
+          req = urllib.request.Request(api, headers={"Accept": "application/vnd.github+json", "User-Agent": "Aabadino-Build-Log-Audit"})
+          with urllib.request.urlopen(req, timeout=30) as response:
+              tree = json.load(response)
+          archives = sorted(
+              item["path"] for item in tree.get("tree", [])
+              if item.get("type") == "blob" and item["path"].lower().endswith(".zip")
+          )
+          if not archives:
+              raise SystemExit("No ZIP build reports found in the Aabadino-Build11-Logs repository.")
+
+          text_exts = {
+              ".log", ".txt", ".json", ".xml", ".yaml", ".yml", ".md",
+              ".html", ".htm", ".csv", ".properties", ".manifest", ".ini",
+              ".cfg", ".gradle", ".java", ".cs", ".sh", ".out", ".err"
+          }
+          name_hints = ("log", "error", "warning", "build", "report", "diagnostic", "summary")
+          severity = re.compile(
+              r"\b(error|exception|warning|failed|failure|fatal|missing|not found|"
+              r"could not|unable to|unsupported|deprecated|obsolete|incompatible|conflict)\b",
+              re.IGNORECASE
+          )
+          full_parts, index_lines, match_lines = [], [], []
+          total_bytes = 0
+          for archive in archives:
+              raw_url = f"https://raw.githubusercontent.com/{owner_repo}/main/{quote(archive, safe='/')}"
+              request = urllib.request.Request(raw_url, headers={"User-Agent": "Aabadino-Build-Log-Audit"})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  payload = response.read()
+              total_bytes += len(payload)
+              index_lines.append(f"{archive}\t{len(payload)} bytes")
+              with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+                  for member in sorted(zf.infolist(), key=lambda entry: entry.filename.lower()):
+                      if member.is_dir():
+                          continue
+                      name = member.filename
+                      suffix = Path(name).suffix.lower()
+                      if suffix not in text_exts and not any(hint in Path(name).name.lower() for hint in name_hints):
+                          continue
+                      if member.file_size > 25 * 1024 * 1024:
+                          index_lines.append(f"  SKIPPED oversized text candidate: {name} ({member.file_size} bytes)")
+                          continue
+                      data = zf.read(member)
+                      if b"\x00" in data[:4096]:
+                          continue
+                      decoded = data.decode("utf-8-sig", errors="replace")
+                      if not decoded.strip():
+                          continue
+                      header = f"\n{'=' * 100}\nARCHIVE: {archive}\nENTRY: {name}\n{'=' * 100}\n"
+                      full_parts.append(header + decoded)
+                      lines = decoded.splitlines()
+                      for number, line in enumerate(lines, 1):
+                          if severity.search(line):
+                              context = " | ".join(
+                                  candidate.strip() for candidate in lines[max(0, number-2):min(len(lines), number+1)]
+                                  if candidate.strip()
+                              )
+                              match_lines.append(f"{archive} :: {name}:{number}: {context[:1200]}")
+          Path("audit/archive-index.txt").write_text(
+              f"Archives examined: {len(archives)}\nCompressed bytes downloaded: {total_bytes}\n\n" +
+              "\n".join(index_lines) + "\n", encoding="utf-8"
+          )
+          Path("audit/all-extracted-text.txt").write_text(
+              "\n".join(full_parts), encoding="utf-8"
+          )
+          Path("audit/error-warning-index.txt").write_text(
+              f"Matched lines: {len(match_lines)}\n\n" + "\n".join(match_lines) + "\n",
+              encoding="utf-8"
+          )
+          print(f"ARCHIVES_EXAMINED={len(archives)}")
+          print(f"COMPRESSED_BYTES={total_bytes}")
+          print(f"TEXT_ENTRIES_EXTRACTED={len(full_parts)}")
+          print(f"ERROR_WARNING_MATCHES={len(match_lines)}")
+          print("ARCHIVES:")
+          for item in index_lines:
+              print(item)
+          print("\nFIRST_MATCHES:")
+          for line in match_lines[:250]:
+              print(line)
+          PY
+      - name: Upload complete extracted reports for review
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Aabadino-Historical-Build-Log-Audit
+          path: audit/
+          if-no-files-found: error
+          retention-days: 7
