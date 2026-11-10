@@ -113,3 +113,5 @@ jobs:
           path: audit/
           if-no-files-found: error
           retention-days: 7
+
+# Audit-only workflow; does not invoke the Unity Editor or consume Unity build quota.
