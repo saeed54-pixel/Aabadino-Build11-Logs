@@ -32,10 +32,15 @@ jobs:
           req = urllib.request.Request(api, headers={"Accept": "application/vnd.github+json", "User-Agent": "Aabadino-Build-Log-Audit"})
           with urllib.request.urlopen(req, timeout=30) as response:
               tree = json.load(response)
-          archives = sorted(
+          archives = [
               item["path"] for item in tree.get("tree", [])
               if item.get("type") == "blob" and item["path"].lower().endswith(".zip")
-          )
+          ]
+          def build_number(path):
+              match = re.search(r"(?:build|biuld|buld)[^0-9]*([0-9]+)", Path(path).stem, re.IGNORECASE)
+              return int(match.group(1)) if match else 0
+          # Audit the newest numbered builds first instead of alphabetical order.
+          archives.sort(key=lambda path: (-build_number(path), path.lower()))
           if not archives:
               raise SystemExit("No ZIP build reports found in the Aabadino-Build11-Logs repository.")
 
@@ -50,7 +55,16 @@ jobs:
               r"could not|unable to|unsupported|deprecated|obsolete|incompatible|conflict)\b",
               re.IGNORECASE
           )
-          full_parts, index_lines, match_lines = [], [], []
+          full_parts, index_lines, match_lines, latest_focus = [], [], [], []
+          priority = re.compile(
+              r"\[(?:error|exception|fatal|warning)\]|"
+              r"\b(?:error CS[0-9]+|BuildFailedException|Unhandled Exception|"
+              r"BUILD FAILED|Build Failed|BuildResult\.Failed|Compilation failed|"
+              r"script compilation failed|failed to compile)\b|"
+              r"Aabadino.*(?:Build Gate|Remote Review|Runtime Resources Audit|"
+              r"GLTF Import Diagnostic|Visual Gate|Toolchain|Graphics API Gate)",
+              re.IGNORECASE
+          )
           total_bytes = 0
           for archive in archives:
               raw_url = f"https://raw.githubusercontent.com/{owner_repo}/main/{quote(archive, safe='/')}"
@@ -86,6 +100,16 @@ jobs:
                                   if candidate.strip()
                               )
                               match_lines.append(f"{archive} :: {name}:{number}: {context[:1200]}")
+                          # Print actionable diagnostics from the three newest numbered builds
+                          # separately; old Unity AssemblyUpdater output creates many false hits.
+                          if build_number(archive) >= 37 and priority.search(line):
+                              context = " | ".join(
+                                  candidate.strip() for candidate in lines[max(0, number-2):min(len(lines), number+1)]
+                                  if candidate.strip()
+                              )
+                              latest_focus.append(
+                                  (build_number(archive), f"{archive} :: {name}:{number}: {context[:1200]}")
+                              )
           Path("audit/archive-index.txt").write_text(
               f"Archives examined: {len(archives)}\nCompressed bytes downloaded: {total_bytes}\n\n" +
               "\n".join(index_lines) + "\n", encoding="utf-8"
@@ -104,8 +128,12 @@ jobs:
           print("ARCHIVES:")
           for item in index_lines:
               print(item)
-          print("\nFIRST_MATCHES:")
-          for line in match_lines[:250]:
+          print("\nLATEST_BUILD_FOCUS (Build 39, 38, 37; filtered actionable diagnostics):")
+          latest_focus.sort(key=lambda item: (-item[0], item[1]))
+          for build, line in latest_focus[:350]:
+              print(line)
+          print("\nFIRST_MATCHES (broad legacy index; may include Unity toolchain noise):")
+          for line in match_lines[:120]:
               print(line)
           PY
       - name: Upload complete extracted reports for review
