@@ -27,7 +27,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence/root evidence/archive
-          find . -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \\) -exec cp -t evidence/root {} +
+          shopt -s nullglob
+          for file in *.jpg *.jpeg *.png; do
+            cp -- "$file" evidence/root/
+          done
           if [ -f scerinshot.zip ]; then
             unzip -q scerinshot.zip -d evidence/archive
           fi
