@@ -22,6 +22,13 @@ jobs:
       - name: Check out screenshot evidence
         uses: actions/checkout@v4
 
+      - name: Check out Aabadino source artwork
+        uses: actions/checkout@v4
+        with:
+          repository: saeed54-pixel/Aabadino
+          ref: fix/build34-empty-scene-setup
+          path: aabadino-project
+
       - name: Collect uploaded screenshots and screenshot archive
         shell: bash
         run: |
@@ -31,8 +38,7 @@ jobs:
           for file in *.jpg *.jpeg *.png; do
             cp -- "$file" evidence/root/
           done
-          if [ -f ../Aabadino/UnityProject/Assets/Resources/Aabadino/Startup/AabadinoSplash.png ]; then cp ../Aabadino/UnityProject/Assets/Resources/Aabadino/Startup/AabadinoSplash.png evidence/project-assets/; fi
-          for asset in assets/abadino_boot_splash.png assets/characters/player_avatars_atlas.png; do
+          for asset in aabadino-project/assets/abadino_boot_splash.png aabadino-project/assets/characters/player_avatars_atlas.png aabadino-project/UnityProject/Assets/Resources/Aabadino/Startup/AabadinoSplash.png aabadino-project/UnityProject/Assets/Resources/Aabadino/UI/PlayerAvatarsAtlas.png; do
             if [ -f "$asset" ]; then cp -- "$asset" evidence/project-assets/; fi
           done
           if [ -f scerinshot.zip ]; then
