@@ -100,8 +100,8 @@ jobs:
                                   if candidate.strip()
                               )
                               match_lines.append(f"{archive} :: {name}:{number}: {context[:1200]}")
-                          # Print actionable diagnostics from the three newest numbered builds
-                          # separately; old Unity AssemblyUpdater output creates many false hits.
+                          # Print actionable diagnostics from Build 37 onward separately; old Unity AssemblyUpdater
+                          # output creates many false hits.
                           if build_number(archive) >= 37 and priority.search(line):
                               context = " | ".join(
                                   candidate.strip() for candidate in lines[max(0, number-2):min(len(lines), number+1)]
@@ -128,7 +128,7 @@ jobs:
           print("ARCHIVES:")
           for item in index_lines:
               print(item)
-          print("\nLATEST_BUILD_FOCUS (Build 39, 38, 37; filtered actionable diagnostics):")
+          print("\nHISTORICAL_BUILD_FOCUS (Build 44 through 37; filtered actionable diagnostics):")
           latest_focus.sort(key=lambda item: (-item[0], item[1]))
           for build, line in latest_focus[:350]:
               print(line)
