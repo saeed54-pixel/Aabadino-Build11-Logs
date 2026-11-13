@@ -1,0 +1,44 @@
+name: Export Aabadino screenshots for visual review
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*.jpg"
+      - "*.jpeg"
+      - "*.png"
+      - "scerinshot.zip"
+      - ".github/workflows/aabadino-screenshot-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out screenshot evidence
+        uses: actions/checkout@v4
+
+      - name: Collect uploaded screenshots and screenshot archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/root evidence/archive
+          find . -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \\) -exec cp -t evidence/root {} +
+          if [ -f scerinshot.zip ]; then
+            unzip -q scerinshot.zip -d evidence/archive
+          fi
+          find evidence -type f -printf '%p %s bytes\\n' | sort
+
+      - name: Upload image evidence
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Aabadino-Screenshot-Evidence
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 3
+
+# Collects existing screenshots only; does not invoke Unity or consume Unity build quota.
