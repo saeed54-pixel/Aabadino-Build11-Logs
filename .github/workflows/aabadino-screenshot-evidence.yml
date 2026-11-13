@@ -26,10 +26,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p evidence/root evidence/archive
+          mkdir -p evidence/root evidence/archive evidence/project-assets
           shopt -s nullglob
           for file in *.jpg *.jpeg *.png; do
             cp -- "$file" evidence/root/
+          done
+          if [ -f ../Aabadino/UnityProject/Assets/Resources/Aabadino/Startup/AabadinoSplash.png ]; then cp ../Aabadino/UnityProject/Assets/Resources/Aabadino/Startup/AabadinoSplash.png evidence/project-assets/; fi
+          for asset in assets/abadino_boot_splash.png assets/characters/player_avatars_atlas.png; do
+            if [ -f "$asset" ]; then cp -- "$asset" evidence/project-assets/; fi
           done
           if [ -f scerinshot.zip ]; then
             unzip -q scerinshot.zip -d evidence/archive
