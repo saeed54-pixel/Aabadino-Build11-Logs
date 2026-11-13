@@ -22,24 +22,14 @@ jobs:
       - name: Check out screenshot evidence
         uses: actions/checkout@v4
 
-      - name: Check out Aabadino source artwork
-        uses: actions/checkout@v4
-        with:
-          repository: saeed54-pixel/Aabadino
-          ref: fix/build34-empty-scene-setup
-          path: aabadino-project
-
       - name: Collect uploaded screenshots and screenshot archive
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p evidence/root evidence/archive evidence/project-assets evidence/build47
+          mkdir -p evidence/root evidence/archive evidence/build47
           shopt -s nullglob
           for file in *.jpg *.jpeg *.png; do
             cp -- "$file" evidence/root/
-          done
-          for asset in aabadino-project/assets/abadino_boot_splash.png aabadino-project/assets/characters/player_avatars_atlas.png aabadino-project/UnityProject/Assets/Resources/Aabadino/Startup/AabadinoSplash.png aabadino-project/UnityProject/Assets/Resources/Aabadino/UI/PlayerAvatarsAtlas.png; do
-            if [ -f "$asset" ]; then cp -- "$asset" evidence/project-assets/; fi
           done
           if [ -f build47.zip ]; then
             while IFS= read -r entry; do
