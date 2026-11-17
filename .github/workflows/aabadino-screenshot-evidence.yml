@@ -8,6 +8,7 @@ on:
       - "*.jpeg"
       - "*.png"
       - "scerinshot.zip"
+      - "تصویر۲۲.zip"
       - ".github/workflows/aabadino-screenshot-evidence.yml"
   workflow_dispatch:
 
@@ -26,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p evidence/root evidence/archive evidence/build47
+          mkdir -p evidence/root evidence/archive evidence/build47 evidence/image22
           shopt -s nullglob
           for file in *.jpg *.jpeg *.png; do
             cp -- "$file" evidence/root/
@@ -43,6 +44,16 @@ jobs:
           fi
           if [ -f scerinshot.zip ]; then
             unzip -q scerinshot.zip -d evidence/archive
+          fi
+          if [ -f "تصویر۲۲.zip" ]; then
+            while IFS= read -r entry; do
+              case "${entry,,}" in
+                *.png|*.jpg|*.jpeg|*.webp)
+                  base=$(basename "$entry")
+                  unzip -p "تصویر۲۲.zip" "$entry" > "evidence/image22/$base"
+                  ;;
+              esac
+            done < <(unzip -Z1 "تصویر۲۲.zip")
           fi
           find evidence -type f -printf '%p %s bytes\\n' | sort
 
